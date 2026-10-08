@@ -1,0 +1,91 @@
+"""Project configuration loaded from configs/*.yaml."""
+
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import yaml
+
+
+DEFAULT_CONFIG = Path("configs/default.yaml")
+
+
+@dataclass(frozen=True)
+class Paths:
+    frames: str = "data/processed/frames"
+    tracks: str = "data/processed/tracks.csv"
+    calibration: str = "data/processed/pitch_calibration.json"
+    homographies: str = "data/processed/homographies.npy"
+    tracks_pitch: str = "data/processed/tracks_pitch.csv"
+    player_metrics: str = "data/processed/player_metrics.csv"
+    outputs: str = "outputs"
+
+
+@dataclass(frozen=True)
+class DetectionConfig:
+    model: str = "yolo11n.pt"
+    tracker: str = "bytetrack.yaml"
+
+
+@dataclass(frozen=True)
+class FramesConfig:
+    every_n_frames: int = 30
+
+
+@dataclass(frozen=True)
+class PitchConfig:
+    length: float = 105.0
+    width: float = 68.0
+
+
+@dataclass(frozen=True)
+class MovementConfig:
+    smoothing_s: float = 0.4
+    max_speed_mps: float = 12.0
+    min_time_on_pitch_s: float = 1.0
+    min_on_pitch_ratio: float = 0.5
+
+
+@dataclass(frozen=True)
+class DemoConfig:
+    frames: int = 300
+
+
+@dataclass(frozen=True)
+class Config:
+    video: str = "data/raw/match.mp4"
+    paths: Paths = field(default_factory=Paths)
+    detection: DetectionConfig = field(default_factory=DetectionConfig)
+    frames: FramesConfig = field(default_factory=FramesConfig)
+    pitch: PitchConfig = field(default_factory=PitchConfig)
+    movement: MovementConfig = field(default_factory=MovementConfig)
+    demo: DemoConfig = field(default_factory=DemoConfig)
+
+
+_SECTIONS = {
+    "paths": Paths,
+    "detection": DetectionConfig,
+    "frames": FramesConfig,
+    "pitch": PitchConfig,
+    "movement": MovementConfig,
+    "demo": DemoConfig,
+}
+
+
+def load_config(path=DEFAULT_CONFIG) -> Config:
+    """Load a YAML config; missing keys fall back to the defaults above."""
+
+    path = Path(path)
+
+    if not path.exists():
+        return Config()
+
+    with open(path, "r") as file:
+        raw = yaml.safe_load(file) or {}
+
+    unknown = set(raw) - set(_SECTIONS) - {"video"}
+    if unknown:
+        raise ValueError(f"Unknown config sections in {path}: {sorted(unknown)}")
+
+    sections = {name: cls(**(raw.get(name) or {})) for name, cls in _SECTIONS.items()}
+
+    return Config(video=raw.get("video", Config.video), **sections)

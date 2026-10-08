@@ -1,0 +1,20 @@
+[project]
+name = "football-vision"
+version = "0.1.0"
+description = "AI-powered football match analysis: detection, tracking, pitch calibration and player analytics."
+readme = "README.md"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ruff.lint.isort]
+lines-after-imports = 2

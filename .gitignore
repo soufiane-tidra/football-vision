@@ -1,0 +1,32 @@
+# Virtual environment
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Data
+data/raw/*
+data/processed/*
+data/samples/*
+
+# Model weights
+models/*.pt
+*.pt
+models/*.onnx
+models/*.engine
+
+# Outputs
+runs/
+outputs/
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

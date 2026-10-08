@@ -1,0 +1,33 @@
+# FootballVision default configuration.
+# All paths are relative to the project root.
+
+video: data/raw/match.mp4
+
+paths:
+  frames: data/processed/frames
+  tracks: data/processed/tracks.csv
+  calibration: data/processed/pitch_calibration.json
+  homographies: data/processed/homographies.npy
+  tracks_pitch: data/processed/tracks_pitch.csv
+  player_metrics: data/processed/player_metrics.csv
+  outputs: outputs
+
+detection:
+  model: yolo11n.pt
+  tracker: bytetrack.yaml
+
+frames:
+  every_n_frames: 30
+
+pitch:
+  length: 105.0
+  width: 68.0
+
+movement:
+  smoothing_s: 0.4
+  max_speed_mps: 12.0          # faster steps are tracking errors
+  min_time_on_pitch_s: 1.0
+  min_on_pitch_ratio: 0.5
+
+demo:
+  frames: 300                  # segment with verified calibration
