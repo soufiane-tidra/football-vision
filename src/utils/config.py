@@ -51,6 +51,23 @@ class DemoConfig:
 
 
 @dataclass(frozen=True)
+class PitchKeypointsConfig:
+    workspace: str = "roboflow-jvuqo"
+    project: str = "football-field-detection-f07vi"
+    version: int = 12
+    dataset_dir: str = "data/datasets/pitch_keypoints"
+    base_model: str = "yolo11s-pose.pt"
+    weights: str = "models/pitch_keypoints.pt"
+    epochs: int = 300
+    imgsz: int = 640
+    batch: int = 16
+    confidence: float = 0.5
+    min_points: int = 6
+    max_error_m: float = 1.0
+    smoothing_frames: int = 5
+
+
+@dataclass(frozen=True)
 class Config:
     video: str = "data/raw/match.mp4"
     paths: Paths = field(default_factory=Paths)
@@ -59,6 +76,7 @@ class Config:
     pitch: PitchConfig = field(default_factory=PitchConfig)
     movement: MovementConfig = field(default_factory=MovementConfig)
     demo: DemoConfig = field(default_factory=DemoConfig)
+    pitch_keypoints: PitchKeypointsConfig = field(default_factory=PitchKeypointsConfig)
 
 
 _SECTIONS = {
@@ -68,6 +86,7 @@ _SECTIONS = {
     "pitch": PitchConfig,
     "movement": MovementConfig,
     "demo": DemoConfig,
+    "pitch_keypoints": PitchKeypointsConfig,
 }
 
 

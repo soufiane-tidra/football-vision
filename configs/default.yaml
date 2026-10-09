@@ -31,3 +31,19 @@ movement:
 
 demo:
   frames: 300                  # segment with verified calibration
+
+pitch_keypoints:
+  # Roboflow "football-field-detection" dataset (32 pitch keypoints, YOLO-pose format)
+  workspace: roboflow-jvuqo
+  project: football-field-detection-f07vi
+  version: 12
+  dataset_dir: data/datasets/pitch_keypoints
+  base_model: yolo11s-pose.pt
+  weights: models/pitch_keypoints.pt
+  epochs: 300
+  imgsz: 640
+  batch: 16
+  confidence: 0.5              # minimum keypoint confidence to use a point
+  min_points: 6                # >4 so RANSAC has redundancy to catch a wrong point
+  max_error_m: 1.0             # reject a frame if inliers disagree more than this
+  smoothing_frames: 5          # temporal smoothing window for homographies

@@ -10,6 +10,7 @@ __pycache__/
 data/raw/*
 data/processed/*
 data/samples/*
+data/datasets/*
 
 # Model weights
 models/*.pt

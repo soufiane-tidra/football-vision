@@ -82,6 +82,23 @@ python -m scripts.analyze_movement       # distance / speed per player
 python -m scripts.make_demo              # annotated video, GIF, heatmaps, stats
 ```
 
+### Automatic pitch calibration (keypoint model)
+
+Instead of clicking keyframes, a YOLO-pose model detects 32 pitch keypoints in every frame
+([Roboflow football-field-detection](https://universe.roboflow.com/roboflow-jvuqo/football-field-detection-f07vi) dataset).
+Requires a free Roboflow API key in `.env` (`ROBOFLOW_API_KEY=...`) and a GPU for training.
+
+```bash
+python -m scripts.download_pitch_dataset           # dataset -> data/datasets/pitch_keypoints
+python -m scripts.check_pitch_dataset              # verify labels match our pitch axes
+python -m scripts.train_pitch_keypoints            # YOLO11-pose -> models/pitch_keypoints.pt
+python -m scripts.test_pitch_keypoints --frame 600  # inspect detections on one frame
+python -m scripts.compute_homographies --method keypoints
+```
+
+Each frame's homography is accepted only if enough confident, non-collinear keypoints agree
+(RANSAC, < 1 m error). Rejected frames are filled by camera tracking, then homographies are smoothed over time.
+
 ### Development
 
 ```bash
@@ -127,7 +144,7 @@ football-vision/
 
 - Generic COCO YOLO model: `person` also includes staff and cameramen (filtered by pitch position and color outliers).
 - Track IDs fragment when players are occluded, and there is no re-identification yet.
-- Pitch calibration needs manual keyframes. Camera tracking drifts on long midfield pans, so the demo uses the verified 10-second segment.
+- Automatic calibration covers every frame but is ~2-2.5 m accurate on this video (domain gap: 222 training images from other stadiums). Manual calibration is ~0.2 m; the demo uses the manually verified 10-second segment.
 - No ball tracking yet.
 
 ## Roadmap
@@ -140,7 +157,8 @@ football-vision/
 - [x] Team classification (unsupervised, jersey colors)
 - [x] Annotated video, 2D minimap, heatmaps
 - [x] YAML configuration, unit tests, CI (GitHub Actions)
-- [ ] Automatic pitch calibration: keypoint detection model (YOLO-pose, 32 pitch keypoints)
+- [x] Automatic pitch calibration: YOLO11-pose pitch keypoint model (pose mAP50 0.995) + line refinement, every frame calibrated
+- [ ] Fine-tune the keypoint model on frames from the target video (current accuracy ~2-2.5 m)
 - [ ] Football-specific detector (player / goalkeeper / referee / ball)
 - [ ] Track stitching and re-identification
 - [ ] Ball tracking, possession, pass detection, passing networks

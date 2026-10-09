@@ -40,10 +40,14 @@ class TrackerConfig:
     pitch_margin_m: float = 2.0      # area around the pitch used for features/lines
     max_corners: int = 600
     refine: bool = True
+    refine_keyframes: bool = False   # also snap keyframes to the lines (for detected, not hand-clicked, keyframes)
     ecc_scale: float = 0.5           # ECC runs at this fraction of the processing resolution (speed)
     ecc_iterations: int = 30
     ecc_min_correlation: float = 0.35
-    ecc_max_shift_px: float = 20.0   # reject refinements that move the image more than this
+    ecc_max_shift_px: float = 20.0   # reject refinements that move the pitch markings more than this
+    keyframe_max_shift_px: float = 60.0  # keyframe refinement may correct more (detections are rougher)
+    keyframe_min_correlation: float = 0.25
+    keyframe_refine_passes: int = 2
 
 
 @dataclass
@@ -71,6 +75,7 @@ class PitchHomographyTracker:
             [dims.length + m, dims.width + m], [-m, dims.width + m], [-m, -m],
         ])
         self.pitch_outline = densify(outline, step=1.0)
+        self.reference_points = np.concatenate(self.dense_lines)
 
         self.overlay_mask = None
         self.stats = TrackingStats()
@@ -119,6 +124,8 @@ class PitchHomographyTracker:
             current = self._prepare(frame)
 
             if t in keyframes:
+                if self.config.refine_keyframes:
+                    keyframes[t] = self._refine_keyframe(current["lines"], keyframes[t])
                 self._solve_interval(left, buffer, (t, current), keyframes, homographies)
                 homographies[t] = keyframes[t]
                 left, buffer = (t, current), []
@@ -255,7 +262,15 @@ class PitchHomographyTracker:
 
         return cv2.bitwise_and(lines, self.overlay_mask)
 
-    def _refine(self, observed_lines, H_pred):
+    def _refine_keyframe(self, observed_lines, H):
+        """Detected keyframes start further from the truth: allow several, looser passes."""
+
+        cfg = self.config
+        for _ in range(cfg.keyframe_refine_passes):
+            H = self._refine(observed_lines, H, cfg.keyframe_max_shift_px, cfg.keyframe_min_correlation)
+        return H
+
+    def _refine(self, observed_lines, H_pred, max_shift_px=None, min_correlation=None):
         """Align predicted pitch lines with observed lines (ECC homography)."""
 
         cfg = self.config
@@ -289,12 +304,23 @@ class PitchHomographyTracker:
         K = np.diag([k, k, 1.0])
         warp = np.linalg.inv(K) @ warp.astype(np.float64) @ K
 
+        # Measure the correction where it matters: on the visible pitch markings
+        # (image corners lie in the crowd and move a lot for tiny perspective changes).
         h, w = observed.shape
-        corners = np.array([[0, 0], [w, 0], [w, h], [0, h]], dtype=np.float64)
-        moved = cv2.perspectiveTransform(corners.reshape(-1, 1, 2), warp).reshape(-1, 2)
-        shift = np.linalg.norm(moved - corners, axis=1).max()
+        markings = project_pitch_to_image(np.linalg.inv(H_pred), self.reference_points)
+        inside = (
+            ~np.isnan(markings).any(axis=1)
+            & (markings[:, 0] >= 0) & (markings[:, 0] < w)
+            & (markings[:, 1] >= 0) & (markings[:, 1] < h)
+        )
+        markings = markings[inside] if inside.any() else np.array([[w / 2, h / 2]])
+        moved = cv2.perspectiveTransform(markings.reshape(-1, 1, 2), warp).reshape(-1, 2)
+        shift = np.linalg.norm(moved - markings, axis=1).max()
 
-        if correlation < cfg.ecc_min_correlation or shift > cfg.ecc_max_shift_px:
+        limit = cfg.ecc_max_shift_px if max_shift_px is None else max_shift_px
+        min_cc = cfg.ecc_min_correlation if min_correlation is None else min_correlation
+
+        if correlation < min_cc or shift > limit:
             self.stats.refine_rejected += 1
             return H_pred
 
