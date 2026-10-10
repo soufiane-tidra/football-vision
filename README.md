@@ -22,6 +22,7 @@
 | 2. Tracking | ByteTrack | Persistent ID per player across frames |
 | 3. Teams and roles | Jersey color clustering (3 clusters, brightness down-weighted) + detector vote + pitch position (goal area, touchline) | Team A / Team B, goalkeeper, referee; pitch-side staff removed |
 | 3b. Track stitching | Fragments of one person merged by team, time gap and reachable distance | 227 tracker fragments -> 37 people |
+| 3c. Ball tracking | Low-confidence candidates on every frame, best physically consistent path by dynamic programming, markings / off-pitch / static / weak stretches rejected, gaps interpolated | Ball position per frame |
 | 4. Pitch calibration | Multi-landmark homography (RANSAC), interactive calibration tool, reprojection + leave-one-out validation | Pixel → meter mapping |
 | 5. Camera tracking | Sparse optical flow on the pitch + ECC alignment to detected pitch lines, keyframe interpolation | One homography per frame for a panning / zooming camera |
 | 6. Movement analytics | Foot-point projection, gap filling, smoothing, physical outlier filtering | Distance (m), speed (km/h), max speed |
@@ -82,6 +83,7 @@ python -m scripts.calibrate_pitch          # click pitch landmarks -> pitch_cali
 python -m scripts.test_pitch_mapper        # validate the calibration (errors + overlay)
 python -m scripts.compute_homographies     # per-frame homographies for a moving camera
 python -m scripts.build_players            # teams, roles, stitched identities -> players.csv
+python -m scripts.track_ball               # ball trajectory -> ball.csv
 python -m scripts.analyze_movement         # distance / speed per identified player
 python -m scripts.make_demo                # annotated video, GIF, heatmaps, stats
 ```
@@ -147,7 +149,7 @@ football-vision/
 ## Current limitations
 
 - The detector confuses roles when kit colors differ from its training matches (here the referee and goalkeeper are often labelled `player`); roles are decided by majority vote per track and will be combined with jersey-color clustering.
-- The ball is detected in about a third of the frames; no interpolation between detections yet.
+- The ball is tracked in 75% of the test clip; it is reported as missing rather than guessed when only weak or static candidates exist. Pitch coordinates assume the ball is on the ground (wrong while it is in the air).
 - A player who leaves the camera view and returns later gets a new identity (13 identities per team instead of 10 on the test clip); fixing this needs appearance or jersey-number re-identification.
 - Speeds depend on calibration quality: homographies are smoothed over 1 s and top speed must be sustained for 0.5 s, which gives realistic values (20-30 km/h) but a standing player still shows about 1 m/s of residual noise.
 - Automatic calibration covers every frame but is ~2-2.5 m accurate on this video (domain gap: 222 training images from other stadiums). Manual calibration is ~0.2 m; the demo uses the manually verified 10-second segment.
@@ -168,7 +170,8 @@ football-vision/
 - [x] Football-specific detector (player / goalkeeper / referee / ball), per-track role by majority vote
 - [x] Teams and roles from color + detector + position, track stitching (227 fragments -> 37 people)
 - [ ] Re-identification of players who leave and re-enter the view (appearance / jersey numbers)
-- [ ] Ball tracking, possession, pass detection, passing networks
+- [x] Ball tracking (trajectory search over low-confidence candidates, interpolation)
+- [ ] Possession, pass detection, passing networks
 - [ ] Sprints, accelerations, team shape and formation analysis
 - [ ] PostgreSQL + FastAPI backend, Streamlit dashboard
 - [ ] Docker, MLflow, integration tests

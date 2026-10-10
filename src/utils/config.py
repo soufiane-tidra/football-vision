@@ -18,6 +18,7 @@ class Paths:
     tracks_pitch: str = "data/processed/tracks_pitch.csv"
     player_metrics: str = "data/processed/player_metrics.csv"
     players: str = "data/processed/players.csv"
+    ball: str = "data/processed/ball.csv"
     outputs: str = "outputs"
 
 
@@ -93,6 +94,16 @@ class StitchingConfig:
 
 
 @dataclass(frozen=True)
+class BallConfig:
+    confidence: float = 0.05
+    max_speed_px: float = 70.0
+    max_gap_frames: int = 30
+    static_s: float = 4.0
+    min_segment_confidence: float = 0.2
+    min_travel_m: float = 10.0
+
+
+@dataclass(frozen=True)
 class Config:
     video: str = "data/raw/match.mp4"
     paths: Paths = field(default_factory=Paths)
@@ -104,6 +115,7 @@ class Config:
     pitch_keypoints: PitchKeypointsConfig = field(default_factory=PitchKeypointsConfig)
     player_detection: PlayerDetectionConfig = field(default_factory=PlayerDetectionConfig)
     stitching: StitchingConfig = field(default_factory=StitchingConfig)
+    ball: BallConfig = field(default_factory=BallConfig)
 
 
 _SECTIONS = {
@@ -116,6 +128,7 @@ _SECTIONS = {
     "pitch_keypoints": PitchKeypointsConfig,
     "player_detection": PlayerDetectionConfig,
     "stitching": StitchingConfig,
+    "ball": BallConfig,
 }
 
 

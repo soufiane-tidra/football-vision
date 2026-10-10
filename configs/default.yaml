@@ -11,6 +11,7 @@ paths:
   tracks_pitch: data/processed/tracks_pitch.csv
   player_metrics: data/processed/player_metrics.csv
   players: data/processed/players.csv
+  ball: data/processed/ball.csv
   outputs: outputs
 
 detection:
@@ -69,3 +70,11 @@ stitching:
   slack_m: 3.0                 # tolerance for calibration noise
   min_player_s: 1.0            # drop leftovers seen for less than this
   touchline_band_m: 1.5        # standing still this close to a touchline for a whole track = staff, not a player
+
+ball:
+  confidence: 0.05             # very low on purpose: false positives are removed by the trajectory search
+  max_speed_px: 70.0           # largest ball displacement per frame (ball speed + camera pan)
+  max_gap_frames: 30           # longest gap that is bridged / interpolated (1 s at 30 fps)
+  min_segment_confidence: 0.2  # weaker continuous stretches are boots / socks, not the ball
+  min_travel_m: 10.0           # a stretch that never leaves a few meters is a marking or a shoe
+  static_s: 4.0                # a pitch spot holding a low-confidence 'ball' this long is a painted marking
