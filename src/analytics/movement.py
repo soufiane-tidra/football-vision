@@ -142,21 +142,48 @@ def calculate_speeds_mps(xy, fps):
     return np.linalg.norm(np.diff(xy, axis=0), axis=1) * fps
 
 
+def sustained_max_speed(speeds, valid, window):
+    """Highest speed held over `window` consecutive valid steps (their mean).
+
+    A top speed must be sustained: a single fast frame-to-frame step is
+    measurement noise, not a sprint.
+    """
+
+    if window <= 1:
+        return float(speeds[valid].max()) if valid.any() else 0.0
+
+    if len(speeds) < window:
+        return 0.0
+
+    kernel = np.ones(window)
+    all_valid = np.convolve(valid.astype(float), kernel, mode="valid") == window
+
+    if not all_valid.any():
+        return 0.0
+
+    means = np.convolve(np.where(valid, speeds, 0.0), kernel, mode="valid") / window
+
+    return float(means[all_valid].max())
+
+
 def compute_movement_metrics(
     player,
     fps,
     smoothing_s=0.4,
     max_speed_mps=12.0,
     min_segment_s=0.5,
+    sustain_s=0.5,
 ):
     """Distance and speed in real units for one track.
 
     max_speed_mps: faster steps are physically impossible for a player
     (world record ~12.4 m/s) and come from tracking errors; they are ignored.
+    sustain_s: the top speed is the fastest speed held for this long.
     """
 
     window = max(1, int(round(smoothing_s * fps)))
     min_frames = int(min_segment_s * fps)
+    sustain = max(1, int(round(sustain_s * fps)))
 
     distance = 0.0
     duration = 0.0
@@ -172,8 +199,7 @@ def compute_movement_metrics(
         distance += float(speeds[valid].sum() / fps)
         duration += float(valid.sum() / fps)
 
-        if valid.any():
-            max_speed = max(max_speed, float(speeds[valid].max()))
+        max_speed = max(max_speed, sustained_max_speed(speeds, valid, sustain))
 
     avg_speed = distance / duration if duration > 0 else 0.0
 

@@ -52,7 +52,8 @@ def load_player_tracks(csv_path, use_feet=True, roles=PLAYER_ROLES, max_frames=N
                 x=x,
                 y=y,
                 confidence=float(row["confidence"]),
-                class_name=row["class_name"]
+                class_name=row["class_name"],
+                box=tuple(float(row[k]) for k in ("x1", "y1", "x2", "y2"))
             )
 
     if roles is None:

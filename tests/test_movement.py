@@ -130,3 +130,16 @@ def test_generic_person_class_still_works(tmp_path):
 
     assert set(load_player_tracks(path)) == {7}
     assert load_player_tracks(path, max_frames=2)[7].frames == [0, 1]
+
+
+def test_top_speed_must_be_sustained():
+    frames, positions = straight_run(speed_mps=4.0, seconds=4)
+    positions[60:] += [0.2, 0.0]       # one noisy step: +0.2 m in a single frame = 6 m/s extra
+
+    spiky = make_player(frames, positions)
+
+    instant = compute_movement_metrics(spiky, FPS, smoothing_s=0, sustain_s=0)
+    sustained = compute_movement_metrics(spiky, FPS, smoothing_s=0, sustain_s=0.5)
+
+    assert instant.max_speed_mps > 9
+    assert sustained.max_speed_mps == pytest.approx(4.0, abs=0.7)

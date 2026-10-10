@@ -11,6 +11,9 @@ class PlayerTrack:
     positions: list[tuple[float, float]] = field(default_factory=list)
     confidences: list[float] = field(default_factory=list)
 
+    # Bounding boxes (x1, y1, x2, y2) in pixels, one per detection (may be empty).
+    boxes: list[tuple[float, float, float, float]] = field(default_factory=list)
+
     # Pitch position in meters, filled by src.pitch.projection (NaN = off the pitch).
     pitch_positions: list[tuple[float, float]] = field(default_factory=list)
 
@@ -23,11 +26,15 @@ class PlayerTrack:
         x: float,
         y: float,
         confidence: float,
-        class_name: str | None = None
+        class_name: str | None = None,
+        box: tuple[float, float, float, float] | None = None
     ):
         self.frames.append(frame)
         self.positions.append((x, y))
         self.confidences.append(confidence)
+
+        if box is not None:
+            self.boxes.append(box)
 
         if class_name is not None:
             self.class_counts[class_name] += 1

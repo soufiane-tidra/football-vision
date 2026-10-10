@@ -47,3 +47,24 @@ def on_pitch_ratio(player):
 
     points = np.array(player.pitch_positions)
     return float((~np.isnan(points).any(axis=1)).mean())
+
+
+def inside_pitch_ratio(player, dims=PitchDimensions(), margin_m=0.5):
+    """Share of a track's positions that lie inside the pitch lines (plus a small margin).
+
+    Coaches, substitutes and cameramen stand just outside the touchline: they
+    pass the loose on_pitch_ratio test but fail this one.
+    """
+
+    points = np.asarray(player.pitch_positions, dtype=float).reshape(-1, 2)
+    points = points[~np.isnan(points).any(axis=1)]
+
+    if len(points) == 0:
+        return 0.0
+
+    inside = (
+        (points[:, 0] >= -margin_m) & (points[:, 0] <= dims.length + margin_m)
+        & (points[:, 1] >= -margin_m) & (points[:, 1] <= dims.width + margin_m)
+    )
+
+    return float(inside.mean())

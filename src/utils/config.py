@@ -17,6 +17,7 @@ class Paths:
     homographies: str = "data/processed/homographies.npy"
     tracks_pitch: str = "data/processed/tracks_pitch.csv"
     player_metrics: str = "data/processed/player_metrics.csv"
+    players: str = "data/processed/players.csv"
     outputs: str = "outputs"
 
 
@@ -66,7 +67,7 @@ class PitchKeypointsConfig:
     confidence: float = 0.5
     min_points: int = 6
     max_error_m: float = 1.0
-    smoothing_frames: int = 5
+    smoothing_frames: int = 31
 
 
 @dataclass(frozen=True)
@@ -83,6 +84,15 @@ class PlayerDetectionConfig:
 
 
 @dataclass(frozen=True)
+class StitchingConfig:
+    max_gap_s: float = 3.0
+    max_speed_mps: float = 8.0
+    slack_m: float = 3.0
+    min_player_s: float = 1.0
+    touchline_band_m: float = 1.5
+
+
+@dataclass(frozen=True)
 class Config:
     video: str = "data/raw/match.mp4"
     paths: Paths = field(default_factory=Paths)
@@ -93,6 +103,7 @@ class Config:
     demo: DemoConfig = field(default_factory=DemoConfig)
     pitch_keypoints: PitchKeypointsConfig = field(default_factory=PitchKeypointsConfig)
     player_detection: PlayerDetectionConfig = field(default_factory=PlayerDetectionConfig)
+    stitching: StitchingConfig = field(default_factory=StitchingConfig)
 
 
 _SECTIONS = {
@@ -104,6 +115,7 @@ _SECTIONS = {
     "demo": DemoConfig,
     "pitch_keypoints": PitchKeypointsConfig,
     "player_detection": PlayerDetectionConfig,
+    "stitching": StitchingConfig,
 }
 
 
