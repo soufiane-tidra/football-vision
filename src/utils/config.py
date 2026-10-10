@@ -19,6 +19,8 @@ class Paths:
     player_metrics: str = "data/processed/player_metrics.csv"
     players: str = "data/processed/players.csv"
     ball: str = "data/processed/ball.csv"
+    possession: str = "data/processed/possession.csv"
+    events: str = "data/processed/events.csv"
     outputs: str = "outputs"
 
 
@@ -50,8 +52,11 @@ class MovementConfig:
 
 
 @dataclass(frozen=True)
-class DemoConfig:
-    frames: int = 300
+class RenderConfig:
+    gif_start_s: float = 20.0
+    gif_duration_s: float = 10.0
+    gif_width: int = 640
+    gif_fps: float = 7.5
 
 
 @dataclass(frozen=True)
@@ -111,7 +116,7 @@ class Config:
     frames: FramesConfig = field(default_factory=FramesConfig)
     pitch: PitchConfig = field(default_factory=PitchConfig)
     movement: MovementConfig = field(default_factory=MovementConfig)
-    demo: DemoConfig = field(default_factory=DemoConfig)
+    render: RenderConfig = field(default_factory=RenderConfig)
     pitch_keypoints: PitchKeypointsConfig = field(default_factory=PitchKeypointsConfig)
     player_detection: PlayerDetectionConfig = field(default_factory=PlayerDetectionConfig)
     stitching: StitchingConfig = field(default_factory=StitchingConfig)
@@ -124,7 +129,7 @@ _SECTIONS = {
     "frames": FramesConfig,
     "pitch": PitchConfig,
     "movement": MovementConfig,
-    "demo": DemoConfig,
+    "render": RenderConfig,
     "pitch_keypoints": PitchKeypointsConfig,
     "player_detection": PlayerDetectionConfig,
     "stitching": StitchingConfig,

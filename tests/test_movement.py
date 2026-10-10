@@ -143,3 +143,37 @@ def test_top_speed_must_be_sustained():
 
     assert instant.max_speed_mps > 9
     assert sustained.max_speed_mps == pytest.approx(4.0, abs=0.7)
+
+
+def test_sprint_and_high_speed_distance():
+    # 3 s jog at 3 m/s, then a 2 s sprint at 8 m/s (28.8 km/h), then 3 s jog.
+    speeds = [3.0] * 90 + [8.0] * 60 + [3.0] * 90
+    xs = np.concatenate([[0.0], np.cumsum(np.array(speeds) / FPS)])
+    positions = np.column_stack([10 + xs, np.full(len(xs), 30.0)])
+
+    metrics = compute_movement_metrics(make_player(np.arange(len(xs)), positions), FPS, smoothing_s=0)
+
+    assert metrics.sprints == 1
+    assert metrics.sprint_distance_m == pytest.approx(16.0, abs=2.5)       # 8 m/s for ~2 s
+    assert metrics.high_speed_distance_m >= metrics.sprint_distance_m
+    assert metrics.max_speed_kmh == pytest.approx(28.8, abs=0.5)
+
+
+def test_jogging_player_has_no_sprints():
+    frames, positions = straight_run(speed_mps=3.5, seconds=6)
+    metrics = compute_movement_metrics(make_player(frames, positions), FPS)
+
+    assert metrics.sprints == 0
+    assert metrics.sprint_distance_m == 0
+    assert metrics.high_speed_distance_m == 0
+
+
+def test_motion_profile_gives_position_and_speed_per_frame():
+    from src.analytics.movement import motion_profile
+
+    frames, positions = straight_run(speed_mps=5.0, seconds=3)
+    xy, kmh = motion_profile(make_player(frames, positions), FPS)
+
+    assert set(xy) == set(kmh) == set(int(f) for f in frames)
+    assert kmh[45] == pytest.approx(18.0, abs=0.5)
+    assert xy[45] == pytest.approx((10.0 + 5.0 * 45 / FPS, 30.0), abs=0.05)

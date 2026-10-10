@@ -73,3 +73,53 @@ def draw_heatmap(diagram: PitchDiagram, points, sigma_m=3.0, colormap=cv2.COLORM
 def _text_color(background):
     b, g, r = background
     return (0, 0, 0) if 0.299 * r + 0.587 * g + 0.114 * b > 140 else (255, 255, 255)
+
+
+def draw_ball(frame, position, trail=(), color=(255, 255, 255)):
+    """Marker above the ball plus a fading trail of its recent positions."""
+
+    points = [(int(round(x)), int(round(y))) for x, y in trail]
+    for i in range(1, len(points)):
+        strength = i / len(points)
+        cv2.line(frame, points[i - 1], points[i], color, max(1, int(3 * strength)), cv2.LINE_AA)
+
+    x, y = int(round(position[0])), int(round(position[1]))
+    triangle = np.array([[x, y - 12], [x - 9, y - 28], [x + 9, y - 28]], dtype=np.int32)
+    cv2.fillPoly(frame, [triangle], color, cv2.LINE_AA)
+    cv2.polylines(frame, [triangle], True, (0, 0, 0), 1, cv2.LINE_AA)
+
+
+def draw_possession_bar(frame, shares, colors, origin, size=(360, 26)):
+    """Horizontal bar split by possession share. shares / colors: lists in the same team order."""
+
+    x, y = origin
+    width, height = size
+    total = sum(shares)
+
+    cv2.rectangle(frame, (x - 2, y - 2), (x + width + 2, y + height + 2), (20, 20, 20), -1)
+
+    if total <= 0:
+        cv2.putText(frame, "possession: -", (x + 8, y + height - 7),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1, cv2.LINE_AA)
+        return
+
+    left = x
+    for share, color in zip(shares, colors):
+        segment = int(round(width * share / total))
+        if segment <= 0:
+            continue
+        cv2.rectangle(frame, (left, y), (left + segment, y + height), color, -1)
+        if segment > 46:
+            cv2.putText(frame, f"{share / total:.0%}", (left + 8, y + height - 7),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, _text_color(color), 1, cv2.LINE_AA)
+        left += segment
+
+
+def display_color(lab_color):
+    """A bright, saturated BGR color with the hue of a jersey color given in Lab."""
+
+    lab = np.uint8([[np.clip(lab_color, 0, 255)]])
+    hsv = cv2.cvtColor(cv2.cvtColor(lab, cv2.COLOR_LAB2BGR), cv2.COLOR_BGR2HSV)[0, 0]
+    hsv = np.uint8([[[hsv[0], max(int(hsv[1]), 170), 255]]])
+
+    return tuple(int(v) for v in cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)[0, 0])

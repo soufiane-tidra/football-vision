@@ -4,13 +4,13 @@
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-**AI-powered football match analysis: from broadcast video to player positions, speeds and heatmaps in real-world units.**
+**AI-powered football match analysis: from broadcast video to identified players, ball, possession, speeds and heatmaps in real-world units.**
 
 ![FootballVision demo](docs/assets/demo.gif)
 
-*PSG vs Bayern, tactical camera. Players are detected, tracked, split into teams by jersey color and projected onto a 2D pitch in meters, with live speed in km/h.*
+*PSG vs Bayern, tactical camera. Fully automatic: players are detected, tracked, assigned to teams and roles, the ball is followed, and everything is projected onto a 2D pitch in meters.*
 
-> 🚧 **Status: working prototype, under active development.** See the [roadmap](#roadmap).
+> 🚧 **Status: working prototype, under active development.** See the [roadmap](#roadmap) and the [limitations](#current-limitations).
 
 ---
 
@@ -18,50 +18,70 @@
 
 | Step | Technique | Output |
 |---|---|---|
-| 1. Detection | YOLO11 fine-tuned on football (player 0.99 / referee 0.98 / goalkeeper 0.97 / ball 0.74 mAP50) | Players, goalkeepers, referees and the ball |
-| 2. Tracking | ByteTrack | Persistent ID per player across frames |
-| 3. Teams and roles | Jersey color clustering (3 clusters, brightness down-weighted) + detector vote + pitch position (goal area, touchline) | Team A / Team B, goalkeeper, referee; pitch-side staff removed |
-| 3b. Track stitching | Fragments of one person merged by team, time gap and reachable distance | 227 tracker fragments -> 37 people |
-| 3c. Ball tracking | Low-confidence candidates on every frame, best physically consistent path by dynamic programming, markings / off-pitch / static / weak stretches rejected, gaps interpolated | Ball position per frame |
-| 4. Pitch calibration | Multi-landmark homography (RANSAC), interactive calibration tool, reprojection + leave-one-out validation | Pixel → meter mapping |
-| 5. Camera tracking | Sparse optical flow on the pitch + ECC alignment to detected pitch lines, keyframe interpolation | One homography per frame for a panning / zooming camera |
-| 6. Movement analytics | Foot-point projection, gap filling, smoothing, physical outlier filtering | Distance (m), speed (km/h), max speed |
-| 7. Visualization | OpenCV | Annotated video, live 2D minimap, team heatmaps |
+| 1. Detection | YOLO11 fine-tuned on football | Players, goalkeepers, referees, ball |
+| 2. Tracking | ByteTrack | Track fragments with temporary IDs |
+| 3. Pitch calibration | YOLO11-pose model for 32 pitch keypoints, RANSAC homography, alignment to detected pitch lines (ECC), temporal smoothing | Pixel → meter mapping on **every frame** of a panning / zooming camera |
+| 4. Teams and roles | Jersey color clustering + detector vote + pitch position | Team A / Team B, goalkeeper, referee; pitch-side staff removed |
+| 5. Track stitching | Fragments merged by team, time gap and reachable distance | One identity per person while in view |
+| 6. Ball tracking | Low-confidence candidates on every frame, best physically consistent path by dynamic programming, interpolation | Ball position per frame |
+| 7. Movement analytics | Foot-point projection, smoothing, physical outlier filtering | Distance, speed, sprints, high-speed running |
+| 8. Possession and passes | Ball-to-feet proximity, spell cleaning, event detection | Possession share, passes, turnovers, passing links |
+| 9. Visualization | OpenCV | Annotated video, live 2D minimap, heatmaps |
 
-## Results
+## Results on the test clip
 
-**Calibration**: predicted pitch lines (red) projected from 15 clicked landmarks onto the frame. Mean reprojection error **0.21 m**, leave-one-out error **0.31 m**.
+36.5 s of a Champions League match, 1096 frames at 1918×1078, filmed by a single camera that pans and zooms.
 
-![Calibration overlay](docs/assets/calibration_overlay.jpg)
+| Stage | Result |
+|---|---|
+| Football detector (validation mAP50) | player **0.994**, referee **0.980**, goalkeeper **0.972**, ball **0.744** |
+| Pitch keypoint model (validation) | pose mAP50 **0.995** |
+| Frames with a valid pitch calibration | **1096 / 1096** |
+| Track fragments → identities | **227 → 37** (13 + 13 outfield players, goalkeeper, officials) |
+| Outfield players followed for (almost) the whole clip | **16** |
+| Ball located | **75%** of frames |
+| Possession | 85% / 15%, 7 passes and 6 turnovers detected |
+| Speeds | top speeds 20–30 km/h, about 97 m covered per player in 36 s |
 
-**Annotated frame**: team colors, track ID, live speed, 2D tactical minimap.
+**Annotated frame**: team colors read from the jerseys, id and live speed, ball marker, player in possession ringed in white, running possession bar, 2D minimap.
 
 ![Annotated frame](docs/assets/demo_frame.jpg)
 
-**Team heatmaps** over the demo sequence:
+**Heatmaps** of both teams and the ball:
 
-![Team heatmaps](docs/assets/heatmaps.png)
+![Heatmaps](docs/assets/heatmaps.png)
+
+**Manual calibration tool**: predicted pitch lines (red) from 15 clicked landmarks, mean reprojection error **0.21 m**. Used as ground truth to evaluate the automatic calibration.
+
+![Calibration overlay](docs/assets/calibration_overlay.jpg)
 
 ## How it works
 
 ```text
 match.mp4
    │
-   ├─► YOLO11 + ByteTrack ───────────────► tracks.csv (boxes + IDs per frame)
-   │
-   ├─► Pitch calibration (keyframes) ────► image ↔ pitch homography
-   │        └─ camera motion + line alignment ─► homography for every frame
-   │
-   └─► Feet position ──homography──► (x, y) in meters
-             │
-             ├─► smoothing ─► distance (m), speed (km/h)
-             ├─► jersey colors ─► K-means ─► teams
-             └─► annotated video · minimap · heatmaps · stats
+   ├─► YOLO11 (football) + ByteTrack ─────► track fragments
+   ├─► YOLO11-pose (32 pitch keypoints) ──► homography per frame ─► refined on pitch lines ─► smoothed
+   └─► YOLO11 at low confidence ──────────► ball candidates ─► trajectory search
+                                                 │
+   fragments + homographies + jersey colors ─────┤
+        │                                        │
+        ├─► team / role / staff filtering        │
+        ├─► stitching ─► players.csv (meters)    │
+        │                                        ▼
+        └─► movement metrics        possession, passes, turnovers
+                       │                         │
+                       └────► annotated video · minimap · heatmaps
 ```
 
-**Why the feet and not the box center?** The homography maps the *ground plane*. The center of a player's box is about 0.9 m above the ground, which shifts positions by several meters at this camera angle.
+Some design decisions:
 
-**Why smoothing?** About 10 cm of detection jitter per frame at 30 fps would read as 3 m/s of fake speed. Positions are smoothed before differentiating, and physically impossible steps (> 12 m/s) are discarded as tracking errors.
+- **Feet, not box centers.** The homography maps the ground plane. A box center is about 0.9 m above the ground, which shifts positions by several meters at this camera angle.
+- **Roles by majority vote and context.** The detector confuses roles when kits differ from its training matches (here the referee and the goalkeeper are often called "player"). Each identity therefore combines jersey color, the detector's vote over the whole track, and position: whoever stays in a goal area is the goalkeeper, a kit matching neither team is an official, someone standing still at the touchline is staff.
+- **Which team defends which goal** is decided with the offside rule: the deepest outfield players in front of a goal belong to the team defending it.
+- **The ball is chosen by its trajectory, not its confidence.** At a confidence of 0.05 the detector proposes candidates in 96% of frames, mostly boots, socks and painted marks. Dynamic programming keeps the one continuous, physically possible path; stretches that are weak or never travel are discarded, so the output says "no ball" rather than guessing.
+- **Possession is measured in the image**, as ball-to-feet distance relative to the player's height, so it does not depend on calibration accuracy.
+- **Speeds are filtered at three levels**: homographies are smoothed over 1 s (the camera moves smoothly, detections jitter), positions are smoothed before differentiating, and a top speed must be sustained for 0.5 s.
 
 ## Quick start
 
@@ -70,59 +90,65 @@ git clone https://github.com/soufiane-tidra/football-vision.git
 cd football-vision
 python -m venv venv
 venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
+
+A GPU build of PyTorch is recommended (see [pytorch.org](https://pytorch.org/get-started/locally/)).
+
+### 1. Train the two models (once)
+
+Both datasets come from Roboflow Universe (CC BY 4.0) and need a free API key in a `.env` file: `ROBOFLOW_API_KEY=...`
+
+```bash
+python -m scripts.download_player_dataset     # players / goalkeepers / referees / ball
+python -m scripts.train_detector              # -> models/football_detector.pt
+
+python -m scripts.download_pitch_dataset      # 32 pitch keypoints
+python -m scripts.check_pitch_dataset         # verify labels match the pitch axes
+python -m scripts.train_pitch_keypoints       # -> models/pitch_keypoints.pt
+```
+
+On an RTX 3060 Ti (8 GB) the detector trains in about 25 minutes and the keypoint model in about 20. Use `python -m scripts.train_detector --resume` to continue an interrupted run.
+
+### 2. Analyse a video
 
 Put a match video at `data/raw/match.mp4` (paths and parameters live in [`configs/default.yaml`](configs/default.yaml)), then:
 
 ```bash
-python -m scripts.download_player_dataset  # football dataset (needs ROBOFLOW_API_KEY in .env)
-python -m scripts.train_detector           # fine-tune YOLO11 -> models/football_detector.pt
-python -m scripts.track                    # detection + ByteTrack -> data/processed/tracks.csv
-python -m scripts.calibrate_pitch          # click pitch landmarks -> pitch_calibration.json
-python -m scripts.test_pitch_mapper        # validate the calibration (errors + overlay)
-python -m scripts.compute_homographies     # per-frame homographies for a moving camera
-python -m scripts.build_players            # teams, roles, stitched identities -> players.csv
-python -m scripts.track_ball               # ball trajectory -> ball.csv
-python -m scripts.analyze_movement         # distance / speed per identified player
-python -m scripts.make_demo                # annotated video, GIF, heatmaps, stats
+python -m scripts.run_pipeline
 ```
 
-### Automatic pitch calibration (keypoint model)
-
-Instead of clicking keyframes, a YOLO-pose model detects 32 pitch keypoints in every frame
-([Roboflow football-field-detection](https://universe.roboflow.com/roboflow-jvuqo/football-field-detection-f07vi) dataset).
-Requires a free Roboflow API key in `.env` (`ROBOFLOW_API_KEY=...`) and a GPU for training.
+which runs these steps in order (each can also be run on its own, or resumed with `--from <step>`):
 
 ```bash
-python -m scripts.download_pitch_dataset           # dataset -> data/datasets/pitch_keypoints
-python -m scripts.check_pitch_dataset              # verify labels match our pitch axes
-python -m scripts.train_pitch_keypoints            # YOLO11-pose -> models/pitch_keypoints.pt
-python -m scripts.test_pitch_keypoints --frame 600  # inspect detections on one frame
-python -m scripts.compute_homographies --method keypoints
+python -m scripts.track                                      # detection + ByteTrack -> tracks.csv
+python -m scripts.compute_homographies --method keypoints    # pitch calibration per frame
+python -m scripts.build_players                              # teams, roles, stitching -> players.csv
+python -m scripts.track_ball                                 # ball trajectory -> ball.csv
+python -m scripts.analyze_movement                           # distance, speed, sprints
+python -m scripts.analyze_possession                         # possession, passes, turnovers
+python -m scripts.render_match                               # annotated video, GIF, heatmaps
 ```
 
-Each frame's homography is accepted only if enough confident, non-collinear keypoints agree
-(RANSAC, < 1 m error). Rejected frames are filled by camera tracking, then homographies are smoothed over time.
+The test clip (36 s) takes about 6 minutes end to end on the GPU above; most of it is the line-based calibration refinement.
+
+### Inspection tools
+
+```bash
+python -m scripts.test_pitch_keypoints --frame 600    # what the keypoint model sees on one frame
+python -m scripts.calibrate_pitch --frame 0           # manual calibration: click landmarks, live line overlay
+python -m scripts.test_pitch_mapper                   # reprojection and leave-one-out error of a manual calibration
+python -m scripts.compute_homographies                # per-frame homographies from manual keyframes
+```
 
 ### Development
 
 ```bash
-pip install -r requirements-dev.txt
-pytest          # unit tests: homography, landmarks, movement, calibration I/O, teams, config
+pytest          # unit tests
 ruff check .    # lint
 ```
 
-Tests and lint run automatically on every push with GitHub Actions.
-
-### Calibration tool
-
-`scripts/calibrate_pitch.py` shows the frame next to a 2D pitch map:
-
-- choose a standard landmark (penalty box corner, center spot, …) with `N` / `P`; its coordinates are filled in automatically
-- click it in the frame using the built-in magnifier
-- predicted pitch lines are drawn live, with the per-point error in meters
-- several keyframes are supported (`--frame 600`)
+Tests and lint run on every push with GitHub Actions. The analytics core is tested without the heavy detection stack.
 
 ## Project structure
 
@@ -130,57 +156,59 @@ Tests and lint run automatically on every push with GitHub Actions.
 football-vision/
 ├── src/
 │   ├── video/            video info, frame extraction
+│   ├── data/             dataset download (Roboflow)
 │   ├── detection/        YOLO detector + ByteTrack tracking
-│   ├── tracking/         track data model, CSV loader
-│   ├── pitch/            landmarks, homography, calibration I/O,
+│   ├── tracking/         track model, loaders, stitching, players.csv I/O
+│   ├── pitch/            landmarks, keypoints, homography, calibration,
 │   │                     camera motion, projection, drawing
-│   ├── classification/   team classification (jersey colors)
-│   ├── analytics/        distance, speed
-│   ├── visualization/    player markers, minimap, heatmaps
+│   ├── classification/   team clustering, identities (team + role)
+│   ├── ball/             candidate detection, trajectory search
+│   ├── analytics/        movement, possession and events
+│   ├── visualization/    player markers, ball, minimap, heatmaps
 │   └── utils/            configuration loading
 ├── scripts/              runnable entry points (python -m scripts.<name>)
-├── configs/              YAML configuration (paths, pitch size, thresholds)
+├── configs/              YAML configuration
 ├── tests/                pytest unit tests
 ├── .github/workflows/    CI (lint + tests)
 ├── docs/assets/          README images
-└── data/                 raw video, processed outputs (not versioned)
+└── data/, models/        video, datasets, outputs, weights (not versioned)
 ```
 
 ## Current limitations
 
-- The detector confuses roles when kit colors differ from its training matches (here the referee and goalkeeper are often labelled `player`); roles are decided by majority vote per track and will be combined with jersey-color clustering.
-- The ball is tracked in 75% of the test clip; it is reported as missing rather than guessed when only weak or static candidates exist. Pitch coordinates assume the ball is on the ground (wrong while it is in the air).
-- A player who leaves the camera view and returns later gets a new identity (13 identities per team instead of 10 on the test clip); fixing this needs appearance or jersey-number re-identification.
-- Speeds depend on calibration quality: homographies are smoothed over 1 s and top speed must be sustained for 0.5 s, which gives realistic values (20-30 km/h) but a standing player still shows about 1 m/s of residual noise.
-- Automatic calibration covers every frame but is ~2-2.5 m accurate on this video (domain gap: 222 training images from other stadiums). Manual calibration is ~0.2 m; the demo uses the manually verified 10-second segment.
-- No ball tracking yet.
+- **Calibration accuracy.** The automatic calibration covers every frame but is about 2–2.5 m accurate on this clip, against 0.2 m for the manual tool. The keypoint model was trained on 222 images from other stadiums. Distances and speeds are therefore indicative: a player standing still still shows about 1 m/s of residual noise.
+- **Identities are not permanent.** A player who leaves the camera view and comes back gets a new identity (13 identities per team instead of 10 on the test clip). This needs appearance or jersey-number re-identification.
+- **Ball.** Tracked in 75% of the clip. Its pitch position assumes it is on the ground, which is wrong while it is in the air. Passes are detected from possession changes and have not been validated against hand-labelled events.
+- **One clip.** All numbers above come from a single 36-second sequence; thresholds were tuned on it.
 
 ## Roadmap
 
-- [x] Video processing and frame extraction
-- [x] Player detection (YOLO11) and multi-object tracking (ByteTrack)
-- [x] Multi-landmark pitch calibration with validation
-- [x] Per-frame homography for a moving camera
-- [x] Real-world distance and speed (m, km/h)
-- [x] Team classification (unsupervised, jersey colors)
-- [x] Annotated video, 2D minimap, heatmaps
-- [x] YAML configuration, unit tests, CI (GitHub Actions)
-- [x] Automatic pitch calibration: YOLO11-pose pitch keypoint model (pose mAP50 0.995) + line refinement, every frame calibrated
-- [ ] Fine-tune the keypoint model on frames from the target video (current accuracy ~2-2.5 m)
-- [x] Football-specific detector (player / goalkeeper / referee / ball), per-track role by majority vote
-- [x] Teams and roles from color + detector + position, track stitching (227 fragments -> 37 people)
-- [ ] Re-identification of players who leave and re-enter the view (appearance / jersey numbers)
-- [x] Ball tracking (trajectory search over low-confidence candidates, interpolation)
-- [ ] Possession, pass detection, passing networks
-- [ ] Sprints, accelerations, team shape and formation analysis
+- [x] Video processing, football-specific detection, multi-object tracking
+- [x] Manual pitch calibration tool with validation
+- [x] Automatic pitch calibration (keypoint model, line refinement, smoothing)
+- [x] Teams, roles, staff filtering, track stitching
+- [x] Ball tracking by trajectory search
+- [x] Distance, speed, sprints, high-speed running
+- [x] Possession, passes, turnovers, passing links
+- [x] Annotated video, minimap, heatmaps, one-command pipeline
+- [x] YAML configuration, unit tests, CI
+- [ ] Fine-tune the keypoint model on the target footage for sub-meter calibration
+- [ ] Re-identification (appearance / jersey numbers) for permanent player identities
+- [ ] Team shape, formations, pressing and line-height metrics
+- [ ] Evaluation against hand-labelled events on several matches
 - [ ] PostgreSQL + FastAPI backend, Streamlit dashboard
-- [ ] Docker, MLflow, integration tests
+- [ ] Docker, MLflow experiment tracking
 
 ## Tech stack
 
-**Computer vision:** Python, OpenCV, NumPy, Ultralytics YOLO11, ByteTrack, homography / RANSAC, optical flow, ECC image alignment, K-means  
-**Engineering:** pytest, ruff, GitHub Actions, YAML config  
-**Planned:** PyTorch training, FastAPI, PostgreSQL, Streamlit, Plotly, Docker, MLflow
+**Computer vision:** Python, PyTorch, Ultralytics YOLO11 (detection and pose), ByteTrack, OpenCV, homography / RANSAC, optical flow, ECC image alignment  
+**Algorithms:** K-means clustering, dynamic programming, greedy track association, signal smoothing  
+**Engineering:** pytest, ruff, GitHub Actions, YAML configuration  
+**Planned:** FastAPI, PostgreSQL, Streamlit, Docker, MLflow
+
+## Acknowledgements
+
+Datasets: [football-players-detection](https://universe.roboflow.com/roboflow-jvuqo/football-players-detection-3zvbc) and [football-field-detection](https://universe.roboflow.com/roboflow-jvuqo/football-field-detection-f07vi) by Roboflow (CC BY 4.0). The pitch keypoint layout follows the Roboflow `sports` project.
 
 ## License
 

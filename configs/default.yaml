@@ -12,6 +12,8 @@ paths:
   player_metrics: data/processed/player_metrics.csv
   players: data/processed/players.csv
   ball: data/processed/ball.csv
+  possession: data/processed/possession.csv
+  events: data/processed/events.csv
   outputs: outputs
 
 detection:
@@ -33,8 +35,11 @@ movement:
   min_time_on_pitch_s: 1.0
   min_on_pitch_ratio: 0.5
 
-demo:
-  frames: 300                  # segment with verified calibration
+render:
+  gif_start_s: 20.0            # README GIF: where it starts and how long it lasts
+  gif_duration_s: 10.0
+  gif_width: 640
+  gif_fps: 7.5
 
 pitch_keypoints:
   # Roboflow "football-field-detection" dataset (32 pitch keypoints, YOLO-pose format)
