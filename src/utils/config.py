@@ -24,6 +24,8 @@ class Paths:
 class DetectionConfig:
     model: str = "yolo11n.pt"
     tracker: str = "bytetrack.yaml"
+    imgsz: int = 640
+    conf: float = 0.25
 
 
 @dataclass(frozen=True)
@@ -68,6 +70,19 @@ class PitchKeypointsConfig:
 
 
 @dataclass(frozen=True)
+class PlayerDetectionConfig:
+    workspace: str = "roboflow-jvuqo"
+    project: str = "football-players-detection-3zvbc"
+    version: int = 12
+    dataset_dir: str = "data/datasets/players"
+    base_model: str = "yolo11s.pt"
+    weights: str = "models/football_detector.pt"
+    epochs: int = 100
+    imgsz: int = 1280
+    batch: int = 6
+
+
+@dataclass(frozen=True)
 class Config:
     video: str = "data/raw/match.mp4"
     paths: Paths = field(default_factory=Paths)
@@ -77,6 +92,7 @@ class Config:
     movement: MovementConfig = field(default_factory=MovementConfig)
     demo: DemoConfig = field(default_factory=DemoConfig)
     pitch_keypoints: PitchKeypointsConfig = field(default_factory=PitchKeypointsConfig)
+    player_detection: PlayerDetectionConfig = field(default_factory=PlayerDetectionConfig)
 
 
 _SECTIONS = {
@@ -87,6 +103,7 @@ _SECTIONS = {
     "movement": MovementConfig,
     "demo": DemoConfig,
     "pitch_keypoints": PitchKeypointsConfig,
+    "player_detection": PlayerDetectionConfig,
 }
 
 

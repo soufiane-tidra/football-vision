@@ -36,6 +36,7 @@ from src.pitch.calibration import Calibration
 from src.pitch.camera_motion import PitchHomographyTracker
 from src.pitch.drawing import PitchDiagram
 from src.pitch.projection import on_pitch_ratio, project_tracks_to_pitch
+from src.tracking.loader import PERSON_CLASSES
 from src.tracking.player import PlayerTrack
 from src.utils.config import load_config
 from src.video.video import get_video_info
@@ -69,7 +70,7 @@ def load_detections(path, max_frames):
         for row in csv.DictReader(file):
             frame = int(row["frame"])
 
-            if row["class_name"] != "person" or frame >= max_frames:
+            if row["class_name"] not in PERSON_CLASSES or frame >= max_frames:
                 continue
 
             track_id = int(row["track_id"])
@@ -78,7 +79,9 @@ def load_detections(path, max_frames):
             detections.setdefault(frame, []).append((track_id, box))
 
             player = players.setdefault(track_id, PlayerTrack(track_id=track_id))
-            player.add_detection(frame, (box[0] + box[2]) / 2, box[3], float(row["confidence"]))
+            player.add_detection(
+                frame, (box[0] + box[2]) / 2, box[3], float(row["confidence"]), row["class_name"]
+            )
 
     return detections, players
 

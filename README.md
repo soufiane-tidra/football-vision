@@ -18,7 +18,7 @@
 
 | Step | Technique | Output |
 |---|---|---|
-| 1. Detection | YOLO11 (Ultralytics) | Bounding boxes for every person on screen |
+| 1. Detection | YOLO11 fine-tuned on football (player 0.99 / referee 0.98 / goalkeeper 0.97 / ball 0.74 mAP50) | Players, goalkeepers, referees and the ball |
 | 2. Tracking | ByteTrack | Persistent ID per player across frames |
 | 3. Team classification | Jersey color (Lab space, grass masked) + K-means, outlier rejection | Team A / Team B / other (referees, staff) |
 | 4. Pitch calibration | Multi-landmark homography (RANSAC), interactive calibration tool, reprojection + leave-one-out validation | Pixel → meter mapping |
@@ -74,12 +74,14 @@ pip install -r requirements.txt
 Put a match video at `data/raw/match.mp4` (paths and parameters live in [`configs/default.yaml`](configs/default.yaml)), then:
 
 ```bash
-python -m scripts.track                  # YOLO + ByteTrack -> data/processed/tracks.csv
-python -m scripts.calibrate_pitch        # click pitch landmarks -> pitch_calibration.json
-python -m scripts.test_pitch_mapper      # validate the calibration (errors + overlay)
-python -m scripts.compute_homographies   # per-frame homographies for a moving camera
-python -m scripts.analyze_movement       # distance / speed per player
-python -m scripts.make_demo              # annotated video, GIF, heatmaps, stats
+python -m scripts.download_player_dataset  # football dataset (needs ROBOFLOW_API_KEY in .env)
+python -m scripts.train_detector           # fine-tune YOLO11 -> models/football_detector.pt
+python -m scripts.track                    # detection + ByteTrack -> data/processed/tracks.csv
+python -m scripts.calibrate_pitch          # click pitch landmarks -> pitch_calibration.json
+python -m scripts.test_pitch_mapper        # validate the calibration (errors + overlay)
+python -m scripts.compute_homographies     # per-frame homographies for a moving camera
+python -m scripts.analyze_movement         # distance / speed per player
+python -m scripts.make_demo                # annotated video, GIF, heatmaps, stats
 ```
 
 ### Automatic pitch calibration (keypoint model)
@@ -142,7 +144,8 @@ football-vision/
 
 ## Current limitations
 
-- Generic COCO YOLO model: `person` also includes staff and cameramen (filtered by pitch position and color outliers).
+- The detector confuses roles when kit colors differ from its training matches (here the referee and goalkeeper are often labelled `player`); roles are decided by majority vote per track and will be combined with jersey-color clustering.
+- The ball is detected in about a third of the frames; no interpolation between detections yet.
 - Track IDs fragment when players are occluded, and there is no re-identification yet.
 - Automatic calibration covers every frame but is ~2-2.5 m accurate on this video (domain gap: 222 training images from other stadiums). Manual calibration is ~0.2 m; the demo uses the manually verified 10-second segment.
 - No ball tracking yet.
@@ -159,7 +162,7 @@ football-vision/
 - [x] YAML configuration, unit tests, CI (GitHub Actions)
 - [x] Automatic pitch calibration: YOLO11-pose pitch keypoint model (pose mAP50 0.995) + line refinement, every frame calibrated
 - [ ] Fine-tune the keypoint model on frames from the target video (current accuracy ~2-2.5 m)
-- [ ] Football-specific detector (player / goalkeeper / referee / ball)
+- [x] Football-specific detector (player / goalkeeper / referee / ball), per-track role by majority vote
 - [ ] Track stitching and re-identification
 - [ ] Ball tracking, possession, pass detection, passing networks
 - [ ] Sprints, accelerations, team shape and formation analysis

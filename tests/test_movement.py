@@ -91,3 +91,42 @@ def test_smoothing_keeps_length_and_straight_lines():
 def test_pixel_distance_still_available():
     player = make_player([0, 1], [(0.0, 0.0), (3.0, 4.0)])
     assert calculate_total_distance(player) == pytest.approx(5.0)
+
+
+# ---------- track loading / roles ----------
+
+def write_tracks(path, rows):
+    header = "frame,track_id,class_id,class_name,confidence,x1,y1,x2,y2,center_x,center_y\n"
+    lines = [f"{f},{t},0,{c},0.9,0,0,10,20,5,10\n" for f, t, c in rows]
+    path.write_text(header + "".join(lines))
+
+
+def test_role_is_majority_class_and_referees_are_excluded(tmp_path):
+    from src.tracking.loader import load_player_tracks
+
+    path = tmp_path / "tracks.csv"
+    write_tracks(path, (
+        [(f, 1, "player") for f in range(8)] + [(8, 1, "referee")]          # player, one bad frame
+        + [(f, 2, "referee") for f in range(8)] + [(8, 2, "player")]        # referee, one bad frame
+        + [(f, 3, "goalkeeper") for f in range(5)]
+        + [(f, 4, "ball") for f in range(5)]
+    ))
+
+    players = load_player_tracks(path)
+    assert set(players) == {1, 3}
+    assert players[1].role == "player" and players[3].role == "goalkeeper"
+    assert players[1].positions[0] == (5.0, 20.0)                            # feet = bottom-center
+
+    everyone = load_player_tracks(path, roles=None)
+    assert set(everyone) == {1, 2, 3}                                        # the ball is never a person
+    assert everyone[2].role == "referee"
+
+
+def test_generic_person_class_still_works(tmp_path):
+    from src.tracking.loader import load_player_tracks
+
+    path = tmp_path / "tracks.csv"
+    write_tracks(path, [(0, 7, "person"), (1, 7, "person"), (5, 7, "person")])
+
+    assert set(load_player_tracks(path)) == {7}
+    assert load_player_tracks(path, max_frames=2)[7].frames == [0, 1]

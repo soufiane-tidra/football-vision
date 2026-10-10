@@ -17,7 +17,9 @@ class FootballDetector:
         self,
         video_path,
         csv_path="data/processed/tracks.csv",
-        tracker="bytetrack.yaml"
+        tracker="bytetrack.yaml",
+        imgsz=640,
+        conf=0.25
     ):
         csv_path = Path(csv_path)
         csv_path.parent.mkdir(parents=True, exist_ok=True)
@@ -28,6 +30,8 @@ class FootballDetector:
             source=video_path,
             tracker=tracker,
             persist=True,
+            imgsz=imgsz,
+            conf=conf,
             stream=True,
             verbose=False
         )

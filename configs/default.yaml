@@ -13,8 +13,10 @@ paths:
   outputs: outputs
 
 detection:
-  model: yolo11n.pt
+  model: models/football_detector.pt   # ball / goalkeeper / player / referee (scripts.train_detector)
   tracker: bytetrack.yaml
+  imgsz: 1280
+  conf: 0.25
 
 frames:
   every_n_frames: 30
@@ -47,3 +49,15 @@ pitch_keypoints:
   min_points: 6                # >4 so RANSAC has redundancy to catch a wrong point
   max_error_m: 1.0             # reject a frame if inliers disagree more than this
   smoothing_frames: 5          # temporal smoothing window for homographies
+
+player_detection:
+  # Roboflow "football-players-detection" dataset: ball, goalkeeper, player, referee
+  workspace: roboflow-jvuqo
+  project: football-players-detection-3zvbc
+  version: 12
+  dataset_dir: data/datasets/players
+  base_model: yolo11s.pt
+  weights: models/football_detector.pt
+  epochs: 100
+  imgsz: 1280                  # the ball is only a few pixels wide: high resolution matters
+  batch: 6

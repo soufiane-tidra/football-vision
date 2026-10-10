@@ -9,7 +9,9 @@ detector = FootballDetector(model_path=config.detection.model)
 csv_path = detector.track_video(
     config.video,
     csv_path=config.paths.tracks,
-    tracker=config.detection.tracker
+    tracker=config.detection.tracker,
+    imgsz=config.detection.imgsz,
+    conf=config.detection.conf
 )
 
 print("Tracking completed.")
