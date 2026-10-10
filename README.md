@@ -26,7 +26,8 @@
 | 6. Ball tracking | Low-confidence candidates on every frame, best physically consistent path by dynamic programming, interpolation | Ball position per frame |
 | 7. Movement analytics | Foot-point projection, smoothing, physical outlier filtering | Distance, speed, sprints, high-speed running |
 | 8. Possession and passes | Ball-to-feet proximity, spell cleaning, event detection | Possession share, passes, turnovers, passing links |
-| 9. Visualization | OpenCV | Annotated video, live 2D minimap, heatmaps |
+| 9. Team shape | Convex hull of the visible outfield players, offside-line rule | Width, depth, compactness, defensive line height over time |
+| 10. Visualization and report | OpenCV, Matplotlib | Annotated video, live 2D minimap, heatmaps, self-contained HTML match report |
 
 ## Results on the test clip
 
@@ -42,6 +43,7 @@
 | Ball located | **75%** of frames |
 | Possession | 85% / 15%, 7 passes and 6 turnovers detected |
 | Speeds | top speeds 20–30 km/h, about 97 m covered per player in 36 s |
+| Team shape | about 35 m wide and 27 m deep on average; defensive lines 32 m and 47 m from their own goals |
 
 **Annotated frame**: team colors read from the jerseys, id and live speed, ball marker, player in possession ringed in white, running possession bar, 2D minimap.
 
@@ -50,6 +52,10 @@
 **Heatmaps** of both teams and the ball:
 
 ![Heatmaps](docs/assets/heatmaps.png)
+
+**Match report** (`outputs/match/report.html`): passing network and team shape over time, plus team and player tables.
+
+![Passing network and team shape](docs/assets/report_charts.png)
 
 **Manual calibration tool**: predicted pitch lines (red) from 15 clicked landmarks, mean reprojection error **0.21 m**. Used as ground truth to evaluate the automatic calibration.
 
@@ -128,6 +134,7 @@ python -m scripts.track_ball                                 # ball trajectory -
 python -m scripts.analyze_movement                           # distance, speed, sprints
 python -m scripts.analyze_possession                         # possession, passes, turnovers
 python -m scripts.render_match                               # annotated video, GIF, heatmaps
+python -m scripts.build_report                               # team shape + HTML match report
 ```
 
 The test clip (36 s) takes about 6 minutes end to end on the GPU above; most of it is the line-based calibration refinement.
@@ -163,8 +170,8 @@ football-vision/
 │   │                     camera motion, projection, drawing
 │   ├── classification/   team clustering, identities (team + role)
 │   ├── ball/             candidate detection, trajectory search
-│   ├── analytics/        movement, possession and events
-│   ├── visualization/    player markers, ball, minimap, heatmaps
+│   ├── analytics/        movement, possession and events, team shape
+│   ├── visualization/    player markers, ball, minimap, heatmaps, report charts
 │   └── utils/            configuration loading
 ├── scripts/              runnable entry points (python -m scripts.<name>)
 ├── configs/              YAML configuration
@@ -190,11 +197,12 @@ football-vision/
 - [x] Ball tracking by trajectory search
 - [x] Distance, speed, sprints, high-speed running
 - [x] Possession, passes, turnovers, passing links
-- [x] Annotated video, minimap, heatmaps, one-command pipeline
+- [x] Team shape (width, depth, compactness, defensive line height)
+- [x] Annotated video, minimap, heatmaps, HTML match report, one-command pipeline
 - [x] YAML configuration, unit tests, CI
 - [ ] Fine-tune the keypoint model on the target footage for sub-meter calibration
 - [ ] Re-identification (appearance / jersey numbers) for permanent player identities
-- [ ] Team shape, formations, pressing and line-height metrics
+- [ ] Formation detection and pressing metrics
 - [ ] Evaluation against hand-labelled events on several matches
 - [ ] PostgreSQL + FastAPI backend, Streamlit dashboard
 - [ ] Docker, MLflow experiment tracking
@@ -202,6 +210,7 @@ football-vision/
 ## Tech stack
 
 **Computer vision:** Python, PyTorch, Ultralytics YOLO11 (detection and pose), ByteTrack, OpenCV, homography / RANSAC, optical flow, ECC image alignment  
+**Analytics and reporting:** NumPy, Matplotlib, self-contained HTML report  
 **Algorithms:** K-means clustering, dynamic programming, greedy track association, signal smoothing  
 **Engineering:** pytest, ruff, GitHub Actions, YAML configuration  
 **Planned:** FastAPI, PostgreSQL, Streamlit, Docker, MLflow

@@ -14,6 +14,7 @@ paths:
   ball: data/processed/ball.csv
   possession: data/processed/possession.csv
   events: data/processed/events.csv
+  team_shape: data/processed/team_shape.csv
   outputs: outputs
 
 detection:

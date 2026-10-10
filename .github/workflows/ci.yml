@@ -20,7 +20,7 @@ jobs:
       # The core (pitch, analytics, classification) does not need the heavy
       # detection stack (ultralytics / torch), so CI installs only what tests use.
       - name: Install dependencies
-        run: pip install numpy opencv-python-headless pillow pyyaml pytest ruff
+        run: pip install numpy opencv-python-headless pillow pyyaml matplotlib pytest ruff
 
       - name: Lint
         run: ruff check src scripts tests

@@ -21,6 +21,7 @@ class Paths:
     ball: str = "data/processed/ball.csv"
     possession: str = "data/processed/possession.csv"
     events: str = "data/processed/events.csv"
+    team_shape: str = "data/processed/team_shape.csv"
     outputs: str = "outputs"
 
 

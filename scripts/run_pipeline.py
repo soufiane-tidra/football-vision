@@ -30,6 +30,7 @@ STEPS = [
     ("analyze_movement", [], "distance, speed and sprints"),
     ("analyze_possession", [], "possession, passes and turnovers"),
     ("render_match", [], "annotated video, GIF and heatmaps"),
+    ("build_report", [], "team shape and HTML match report"),
 ]
 
 
